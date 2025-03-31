@@ -7,25 +7,31 @@
 # ]
 # ///
 import re
+import logging
 import argparse
 import feedparser
 import requests
 import time
 import shapely.geometry
 
+logger = logging.getLogger(__name__)
+
 
 def get_alerts(feed_url):
     feed = feedparser.parse(feed_url)
     alerts = []
     for entry in feed.entries:
-        alert = {
-            "title": entry.title,
-            "summary": entry.summary,
-            "link": entry.link,
-            "description": entry.description,
-            "coords": entry.where.coordinates[0],
-        }
-        alerts.append(alert)
+        try:
+            alert = {
+                "title": entry.title,
+                "summary": entry.summary,
+                "link": entry.link,
+                "description": entry.description,
+                "coords": entry.where.coordinates[0],
+            }
+            alerts.append(alert)
+        except Exception as e:
+            logger.error(e)
     return alerts
 
 
@@ -38,7 +44,7 @@ def strip_tags(html):
 def notify(topic, alert):
     title = strip_tags(alert["title"])
     summary = strip_tags(alert["summary"])
-    print(f"Notify alert: {title}")
+    logger.info(f"Notify alert: {title}")
     requests.post("https://ntfy.sh", json={
         "topic": topic,
         "title": title,
@@ -61,7 +67,7 @@ def is_within_polygon(alert, user_location) -> bool:
         point = shapely.geometry.Point(user_location)
         return polygon.contains(point)
     except Exception as e:
-        print(f"Error processing polygon: {e}")
+        logger.error(e)
         return False
 
 
@@ -71,7 +77,9 @@ def main(args):
     coords = (args.lon, args.lat)
 
     while True:
+        logger.debug("check")
         alerts = get_alerts(FEED_URL)
+        logger.debug(f"alerts: {len(alerts)}")
         for alert in alerts:
             if alert["title"] not in seen_alerts and is_within_polygon(alert, coords):
                 notify(args.topic, alert)
@@ -85,5 +93,7 @@ if __name__ == "__main__":
     parser.add_argument("--lon", type=float, required=True)
     parser.add_argument("-t", "--topic", required=True)
     parser.add_argument("-i", "--interval", type=int, help="interval (secs)", default=300)
+    parser.add_argument("-v", "--verbose", action="store_true", default=False)
     args = parser.parse_args()
+    logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level="DEBUG" if args.verbose else "INFO")
     main(args)

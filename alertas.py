@@ -49,7 +49,7 @@ def notify(topic, alert):
         "topic": topic,
         "title": title,
         "message": summary,
-        "click": "https://smn.gob.ar/alertas",
+        "click": "https://smn-acp-map.vercel.app",
         "priority": 4,
         "tags": ["cloud_with_lightning"]
     })
